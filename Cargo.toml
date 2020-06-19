@@ -7,7 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-url = "2.1.1"
+url = { version = "2.1.1", features = ["serde"] }
 reqwest = { version = "0.10.6", features = ["json"] }
 serde = { version = "1.0.112", features = ["derive"] }
 thiserror = "1.0.20"
+quick-xml = { version = "0.18.1", features = ["serialize"] }
+tokio = { version = "0.2.21", features = ["time", "rt-core"] }
+log = "0.4.8"
+uuid = { version = "0.8.1", features = ["serde"] }
