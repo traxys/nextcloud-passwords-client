@@ -23,6 +23,8 @@ pub enum Error {
     DisconnectionFailed,
     #[error("last shutdown time is in the future")]
     TimeError(#[from] std::time::SystemTimeError),
+    #[error("setting was not valid in this context")]
+    InvalidSetting,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -63,13 +65,13 @@ pub struct AuthenticatedApi {
 }
 
 pub struct SettingsBuilder<'api> {
-    settings: std::collections::HashSet<String>,
+    settings: Vec<String>,
     api: &'api AuthenticatedApi,
 }
 
 impl<'api> SettingsBuilder<'api> {
     pub fn get(mut self, setting: impl settings::Setting) -> Self {
-        self.settings.insert(setting.name());
+        self.settings.push(setting.name());
         self
     }
     pub async fn query(self) -> Result<Vec<settings::SettingValue>, Error> {
@@ -117,11 +119,8 @@ impl AuthenticatedApi {
         self.passwords_request(endpoint, reqwest::Method::POST, data)
             .await
     }
-    pub fn get_settings(&self) -> SettingsBuilder {
-        SettingsBuilder {
-            settings: std::collections::HashSet::new(),
-            api: self,
-        }
+    pub fn get_settings(&self) -> settings::SettingsFetcher {
+        settings::SettingsFetcher { api: self }
     }
     async fn query_settings(
         &self,
@@ -201,16 +200,7 @@ impl AuthenticatedApi {
             session_id: session_id.clone(),
             keepalive: 0,
         };
-        api.keepalive = match api
-            .get_settings()
-            .get(settings::UserSettings::SessionLifetime)
-            .query()
-            .await?
-            .get(0)
-        {
-            Some(settings::SettingValue::SessionLifetime(k)) => *k,
-            _ => panic!("server is not returning keepalive when asked nicely"),
-        };
+        api.keepalive = api.get_settings().session_lifetime().await?;
         log::debug!("Session keepalive is: {}", api.keepalive);
 
         Ok((api, session_id))
