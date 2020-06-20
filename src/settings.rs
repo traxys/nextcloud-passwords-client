@@ -2,13 +2,17 @@ use serde::{Serialize, Deserialize};
 use url::Url;
 use crate::AuthenticatedApi;
 
+/// Fetch a single setting
 pub struct SettingsFetcher<'api> {
     pub(crate) api: &'api AuthenticatedApi,
 }
 
+/// Represent a way to map the settings enums to nextcloud passwords 
+/// setting names
 pub trait Setting: super::private::Sealed {
     fn name(&self) -> String;
 }
+/// What settings are writable by the API
 pub trait WritableSetting: Setting {}
 
 macro_rules! settings {
@@ -18,8 +22,16 @@ macro_rules! settings {
     }) => {
 
         /// The names of all the settings
-        pub static SETTINGS_NAMES: &'static [&'static str] = &[ 
+        pub const SETTINGS_NAMES: &'static [&'static str] = &[ 
             $($user_setting,)*
+            $($server_setting,)* 
+        ];
+        /// The names of user settings
+        pub const USER_SETTING_NAMES: &'static [&'static str] = &[ 
+            $($user_setting,)*
+        ];
+        /// The name of server settings
+        pub const SERVER_SETTING_NAMES: &'static [&'static str] = &[ 
             $($server_setting,)* 
         ];
 
@@ -48,7 +60,7 @@ macro_rules! settings {
                     )*
                 )?
             };
-            (item $dol (=> ( $dol($dol prefix:tt)* ) => )? $dol callback:ident ($dol ($dol args:tt)*) $dol (=> ($dol($dol suffix:tt)*) )? ) => {
+            (item $dol (=> ( $dol($dol prefix:tt)* ) => )? $dol callback:ident ($dol ($dol args:tt)*) $dol (=> $dol($dol suffix:tt)* )? ) => {
                 $dol (
                     $dol (
                         $dol prefix
@@ -67,7 +79,76 @@ macro_rules! settings {
                 )?
             };
         }
+        /// Check the definition of [macro_on_settings]
+        #[macro_export]
+        macro_rules! macro_on_user_settings {
+            (expr $dol (=> $dol($dol prefix:tt)* => )? $dol callback:ident ($dol ($dol args:tt)*) $dol (=> $dol($dol suffix:tt)*  )? ) => {
+                $dol (
+                    $dol (
+                        $dol prefix
+                    )*
+                )?
+                $(
+                    $dol callback!($user_variant; $user_type; $user_field; $user_setting => $dol ($dol args)*);
+                )*
+                $dol (
+                    $dol (
+                        $dol suffix
+                    )*
+                )?
+            };
+            (item $dol (=> ( $dol($dol prefix:tt)* ) => )? $dol callback:ident ($dol ($dol args:tt)*) $dol (=> ($dol($dol suffix:tt)*) )? ) => {
+                $dol (
+                    $dol (
+                        $dol prefix
+                    )*
+                )?
+                $(
+                    $dol callback!{$user_variant; $user_type; $user_field; $user_setting => $dol ($dol args)*}
+                )*
+                $dol (
+                    $dol (
+                        $dol suffix
+                    )*
+                )?
+            };
+        }
+        /// Check the definition of [macro_on_settings]
+        #[macro_export]
+        macro_rules! macro_on_server_settings {
+            (expr $dol (=> $dol($dol prefix:tt)* => )? $dol callback:ident ($dol ($dol args:tt)*) $dol (=> $dol($dol suffix:tt)*  )? ) => {
+                $dol (
+                    $dol (
+                        $dol prefix
+                    )*
+                )?
+                $(
+                    $dol callback!($user_variant; $user_type; $user_field; $user_setting => $dol ($dol args)*);
+                )*
+                $dol (
+                    $dol (
+                        $dol suffix
+                    )*
+                )?
+            };
+            (item $dol (=> ( $dol($dol prefix:tt)* ) => )? $dol callback:ident ($dol ($dol args:tt)*) $dol (=> ($dol($dol suffix:tt)*) )? ) => {
+                $dol (
+                    $dol (
+                        $dol prefix
+                    )*
+                )?
+                $(
+                    $dol callback!{$user_variant; $user_type; $user_field; $user_setting => $dol ($dol args)*}
+                )*
+                $dol (
+                    $dol (
+                        $dol suffix
+                    )*
+                )?
+            };
+        }
 
+        /// User Setting names
         #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
         pub enum $user {
             $($user_variant,)*
@@ -98,12 +179,14 @@ macro_rules! settings {
         }
 
 
+        /// User Setting Values
         #[derive(Serialize, Deserialize, Debug)]
         pub enum $valued_user {
             $($user_variant($user_type),)*
         }
 
         impl $valued_user {
+            /// Return the name of the setting
             pub fn kind(&self) -> $user {
                 match self {
                     $(
@@ -112,6 +195,7 @@ macro_rules! settings {
                 }
             }
             $(
+                /// Coerce the value of the setting to this setting
                 pub fn $user_field(self) -> Result<$user_type, Self> {
                     match self {
                         Self::$user_variant(v) => Ok(v),
@@ -129,16 +213,19 @@ macro_rules! settings {
             }
         }
 
+        /// Server Setting Names
         #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
         pub enum $server {
             $($server_variant,)*
         }
 
+        /// Server Setting Values
         #[derive(Serialize, Deserialize, Debug)]
         pub enum $valued_server {
             $($server_variant($server_type),)*
         }
         impl $valued_server {
+            /// Return the name of the setting
             pub fn kind(&self) -> $server {
                 match self {
                     $(
@@ -147,6 +234,7 @@ macro_rules! settings {
                 }
             }
             $(
+                /// Coerce the value of the setting to this setting
                 pub fn $server_field(self) -> Result<$server_type, Self> {
                     match self {
                         Self::$server_variant(v) => Ok(v),
@@ -164,7 +252,8 @@ macro_rules! settings {
             }
         }
 
-        #[derive(Debug)]
+        /// The value of a Setting
+        #[derive(Serialize, Deserialize, Debug)]
         pub enum SettingValue {
             $(
                 $user_variant($user_type),
@@ -174,7 +263,8 @@ macro_rules! settings {
             )*
             Client { name: String, value: String }
         }
-        #[derive(PartialEq, Eq, Debug)]
+        /// Setting name
+        #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Hash)]
         pub enum SettingVariant {
             $(
                 $user_variant,
@@ -197,20 +287,6 @@ macro_rules! settings {
                 }
             }
         }
-        /*impl SettingValue {
-            pub(crate) fn is_variant(&self, variant: SettingVariant) -> bool {
-                match self {
-                    $(
-                        Self::$user_variant(_) if variant == SettingVariant::$user_variant => true,
-                    )*
-                    $(
-                        Self::$server_variant(_) if variant == SettingVariant::$server_variant => true,
-                    )*
-                    Self::Client { .. } if variant == SettingVariant::Client => true,
-                    _ => unreachable!(),
-                }
-            }
-        }*/
 
         impl From<$user> for SettingVariant {
             fn from(value: $user) -> Self {
@@ -339,6 +415,7 @@ impl Setting for ClientSettings {
     }
 }
 
+/// An arbitrary client setting
 pub struct ClientSettings {
     pub name: String,
 }

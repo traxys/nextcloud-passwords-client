@@ -2,7 +2,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 pub use url::Url;
 
+/// Data types and builders to interact with the passwords API
 pub mod password;
+/// Data types, helpers and builders to interact with the settings API
 pub mod settings;
 
 mod private {
@@ -13,6 +15,7 @@ mod private {
     impl Sealed for super::settings::ClientSettings {}
 }
 
+/// Errors
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("error in communicating with the API")]
@@ -27,9 +30,10 @@ pub enum Error {
     InvalidSetting,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SessionRequest {}
 
+/// Represent how to first connect to a nextcloud instance
+/// The best way to obtain some is using [Login flow
+/// v2](https://docs.nextcloud.com/server/19/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoginDetails {
     pub server: Url,
@@ -39,6 +43,7 @@ pub struct LoginDetails {
     pub app_password: String,
 }
 
+/// The state needed to re-connect to a nextcloud instance
 #[derive(Serialize, Deserialize)]
 pub struct ResumeState {
     server_url: Url,
@@ -52,6 +57,7 @@ pub struct ResumeState {
     password: String,
 }
 
+/// The main entrypoint to the nextcloud API
 pub struct AuthenticatedApi {
     server_url: Url,
     client: Client,
@@ -64,6 +70,8 @@ pub struct AuthenticatedApi {
     password: String,
 }
 
+/// Structure to query multiple settings, see
+/// [get_multiple_settings](AuthenticatedApi::get_multiple_settings)
 pub struct SettingsBuilder<'api> {
     settings: Vec<String>,
     api: &'api AuthenticatedApi,
@@ -121,6 +129,12 @@ impl AuthenticatedApi {
     }
     pub fn get_settings(&self) -> settings::SettingsFetcher {
         settings::SettingsFetcher { api: self }
+    }
+    pub fn get_multiple_settings(&self) -> SettingsBuilder<'_> {
+        SettingsBuilder {
+            api: self,
+            settings: Vec::new(),
+        }
     }
     async fn query_settings(
         &self,
