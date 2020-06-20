@@ -89,6 +89,7 @@ impl<'api> SettingsBuilder<'api> {
 }
 
 impl AuthenticatedApi {
+    /// Return the URL of the nextcloud instance
     pub fn server(&self) -> &Url {
         &self.server_url
     }
@@ -127,9 +128,11 @@ impl AuthenticatedApi {
         self.passwords_request(endpoint, reqwest::Method::POST, data)
             .await
     }
+    /// Fetch one setting
     pub fn get_settings(&self) -> settings::SettingsFetcher {
         settings::SettingsFetcher { api: self }
     }
+    /// Fetch multiple settings
     pub fn get_multiple_settings(&self) -> SettingsBuilder<'_> {
         SettingsBuilder {
             api: self,
@@ -145,6 +148,7 @@ impl AuthenticatedApi {
             .await?;
         Ok(data.to_values())
     }
+    /// Resume a connection to the API using the state. Also gives the session ID
     pub async fn resume_session(resume_state: ResumeState) -> Result<(Self, String), Error> {
         if resume_state.shutdown_time.elapsed()?.as_secs() > resume_state.keepalive {
             log::debug!("Session was too old, creating new session");
@@ -176,6 +180,7 @@ impl AuthenticatedApi {
             Ok((api, session_id))
         }
     }
+    /// Create a new session to the API, returns the session ID
     pub async fn new_session(login_details: LoginDetails) -> Result<(Self, String), Error> {
         #[derive(Serialize, Deserialize, Debug)]
         struct OpenSession {
@@ -219,6 +224,8 @@ impl AuthenticatedApi {
 
         Ok((api, session_id))
     }
+
+    /// Disconnect from the session
     pub async fn disconnect(self) -> Result<(), Error> {
         #[derive(Deserialize)]
         struct CloseSession {
@@ -232,6 +239,8 @@ impl AuthenticatedApi {
             Ok(())
         }
     }
+
+    /// List all the passwords known for this user
     pub async fn list_passwords(&self) -> Result<Vec<password::Password>, Error> {
         #[derive(Serialize, Deserialize)]
         struct Details {
@@ -246,6 +255,7 @@ impl AuthenticatedApi {
             )
             .await?)
     }
+    /// Get the state to be able to resume this session
     pub fn get_state(&self) -> ResumeState {
         ResumeState {
             server_url: self.server_url.clone(),
