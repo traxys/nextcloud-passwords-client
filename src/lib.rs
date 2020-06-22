@@ -128,6 +128,7 @@ impl AuthenticatedApi {
         self.passwords_request(endpoint, reqwest::Method::POST, data)
             .await
     }
+
     /// Fetch one setting
     pub fn get_settings(&self) -> settings::SettingsFetcher {
         settings::SettingsFetcher { api: self }
@@ -139,6 +140,17 @@ impl AuthenticatedApi {
             settings: Vec::new(),
         }
     }
+    /// Fetch all the settings
+    pub async fn get_all_settings(&self) -> Result<settings::AllSettings, crate::Error> {
+        Ok(self.passwords_get("1.0/settings/list", ()).await?)
+    }
+    
+    /// Set the value of a writable setting
+    pub async fn set_settings(&self, settings: settings::Settings) -> Result<Vec<settings::SettingValue>, Error> {
+        let settings: settings::Settings = self.passwords_post("1.0/settings/set", settings).await?;
+        Ok(settings.to_values())
+    }
+
     async fn query_settings(
         &self,
         settings: SettingsBuilder<'_>,
