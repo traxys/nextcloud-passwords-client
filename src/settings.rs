@@ -6,6 +6,9 @@ use url::Url;
 pub struct SettingsFetcher<'api> {
     pub(crate) api: &'api AuthenticatedApi,
 }
+pub struct SettingReset<'api> {
+    pub(crate) api: &'api AuthenticatedApi,
+}
 
 /// Represent a way to map the settings enums to nextcloud passwords
 /// setting names
@@ -98,17 +101,27 @@ macro_rules! settings {
             }
         }
 
+        impl<'api> SettingReset<'api> {
+            $(
+                pub async fn $user_field(&self) -> Result<$user_type, crate::Error> {
+                    let data: Settings = self.api.passwords_post("1.0/settings/reset", vec![$user_setting]).await?;
+                    Ok(data.$user_field.expect("server did not provide the asked setting"))
+                }
+            )*
+
+        }
+
         impl<'api> SettingsFetcher<'api> {
             $(
                 pub async fn $user_field(&self) -> Result<$user_type, crate::Error> {
                     let data: Settings = self.api.passwords_post("1.0/settings/get", vec![$user_setting]).await?;
-                    Ok(data.$user_field.expect("server did not provide the asked password"))
+                    Ok(data.$user_field.expect("server did not provide the asked setting"))
                 }
             )*
             $(
                 pub async fn $server_field(&self) -> Result<$server_type, crate::Error> {
                     let data: Settings = self.api.passwords_post("1.0/settings/get", vec![$server_setting]).await?;
-                    Ok(data.$server_field.expect("server did not provide the asked password"))
+                    Ok(data.$server_field.expect("server did not provide the asked setting"))
                 }
             )*
             pub async fn from_variant(&self, variant: SettingVariant) -> Result<SettingValue, crate::Error> {

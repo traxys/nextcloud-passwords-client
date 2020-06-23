@@ -30,7 +30,6 @@ pub enum Error {
     InvalidSetting,
 }
 
-
 /// Represent how to first connect to a nextcloud instance
 /// The best way to obtain some is using [Login flow
 /// v2](https://docs.nextcloud.com/server/19/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2)
@@ -130,8 +129,11 @@ impl AuthenticatedApi {
     }
 
     /// Fetch one setting
-    pub fn get_settings(&self) -> settings::SettingsFetcher {
+    pub fn get_setting(&self) -> settings::SettingsFetcher {
         settings::SettingsFetcher { api: self }
+    }
+    pub fn reset_setting(&self) -> settings::SettingReset {
+        settings::SettingReset { api: self }
     }
     /// Fetch multiple settings
     pub fn get_multiple_settings(&self) -> SettingsBuilder<'_> {
@@ -144,10 +146,14 @@ impl AuthenticatedApi {
     pub async fn get_all_settings(&self) -> Result<settings::AllSettings, crate::Error> {
         Ok(self.passwords_get("1.0/settings/list", ()).await?)
     }
-    
+
     /// Set the value of a writable setting
-    pub async fn set_settings(&self, settings: settings::Settings) -> Result<Vec<settings::SettingValue>, Error> {
-        let settings: settings::Settings = self.passwords_post("1.0/settings/set", settings).await?;
+    pub async fn set_settings(
+        &self,
+        settings: settings::Settings,
+    ) -> Result<Vec<settings::SettingValue>, Error> {
+        let settings: settings::Settings =
+            self.passwords_post("1.0/settings/set", settings).await?;
         Ok(settings.to_values())
     }
 
@@ -231,7 +237,7 @@ impl AuthenticatedApi {
             session_id: session_id.clone(),
             keepalive: 0,
         };
-        api.keepalive = api.get_settings().session_lifetime().await?;
+        api.keepalive = api.get_setting().session_lifetime().await?;
         log::debug!("Session keepalive is: {}", api.keepalive);
 
         Ok((api, session_id))
