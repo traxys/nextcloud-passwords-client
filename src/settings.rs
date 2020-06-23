@@ -24,7 +24,7 @@ pub enum ParseError {
     Number(#[from] std::num::ParseIntError),
 
     #[error("could not parse a boolean")]
-    Boolean(#[from] std::str::ParseBoolError)
+    Boolean(#[from] std::str::ParseBoolError),
 }
 
 macro_rules! settings {
@@ -124,6 +124,10 @@ macro_rules! settings {
                     Ok(data.$server_field.expect("server did not provide the asked setting"))
                 }
             )*
+            pub async fn client_setting<D: serde::de::DeserializeOwned>(&self, client_setting: ClientSettings) -> Result<Option<D>, crate::Error> {
+                let mut data: std::collections::HashMap<String, Option<D>> = self.api.passwords_post("1.0/settings/get", vec![client_setting.name()]).await?;
+                Ok(data.remove(&client_setting.name()).flatten())
+            }
             pub async fn from_variant(&self, variant: SettingVariant) -> Result<SettingValue, crate::Error> {
                 match variant {
                     SettingVariant::Client => Err(crate::Error::InvalidSetting),

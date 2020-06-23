@@ -156,6 +156,19 @@ impl AuthenticatedApi {
             self.passwords_post("1.0/settings/set", settings).await?;
         Ok(settings.to_values())
     }
+    pub async fn set_client_setting<D: Serialize + serde::de::DeserializeOwned>(
+        &self,
+        name: settings::ClientSettings,
+        value: D,
+    ) -> Result<D, Error> {
+        type ClientData<D> = std::collections::HashMap<String, D>;
+        let mut data = ClientData::new();
+        data.insert(name.name.clone(), value);
+        let mut data: ClientData<D> = self.passwords_post("1.0/settings/set", data).await?;
+        Ok(data
+            .remove(&name.name)
+            .expect("server did not set client setting"))
+    }
 
     async fn query_settings(
         &self,
