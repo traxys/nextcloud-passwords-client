@@ -6,6 +6,10 @@ pub use url::Url;
 pub mod password;
 /// Data types, helpers and builders to interact with the settings API
 pub mod settings;
+/// Data types to interract with the folder API
+pub mod folder;
+
+mod utils;
 
 mod private {
     pub trait Sealed {}
@@ -281,7 +285,7 @@ impl AuthenticatedApi {
             .passwords_post(
                 "1.0/password/list",
                 Details {
-                    details: "model".into(),
+                    details: "model+revisions".into(),
                 },
             )
             .await?)
