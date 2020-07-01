@@ -2,12 +2,12 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 pub use url::Url;
 
+/// Data types to interract with the folder API
+pub mod folder;
 /// Data types and builders to interact with the passwords API
 pub mod password;
 /// Data types, helpers and builders to interact with the settings API
 pub mod settings;
-/// Data types to interract with the folder API
-pub mod folder;
 
 mod utils;
 
@@ -276,7 +276,10 @@ impl AuthenticatedApi {
     }
 
     /// List all the passwords known for this user
-    pub async fn list_passwords(&self) -> Result<Vec<password::Password>, Error> {
+    pub async fn list_passwords(
+        &self,
+        details: password::Details,
+    ) -> Result<Vec<password::Password>, Error> {
         #[derive(Serialize, Deserialize)]
         struct Details {
             details: String,
@@ -285,11 +288,20 @@ impl AuthenticatedApi {
             .passwords_post(
                 "1.0/password/list",
                 Details {
-                    details: "model+revisions".into(),
+                    details: details.to_string(),
                 },
             )
             .await?)
     }
+    pub async fn create_password(
+        &self,
+        password: password::CreatePassword,
+    ) -> Result<password::PasswordCreated, Error> {
+        self.passwords_post("1.0/password/create", password)
+            .await
+            .map_err(Into::into)
+    }
+
     /// Get the state to be able to resume this session
     pub fn get_state(&self) -> ResumeState {
         ResumeState {
