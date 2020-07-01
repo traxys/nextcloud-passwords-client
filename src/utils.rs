@@ -60,7 +60,7 @@ macro_rules! create_binding {
                 }
                 $(
                     pub fn $w_field(mut self, value: $w_type) -> Self {
-                        self.$w_field = value;
+                        self.$w_field = Some(value);
                         self
                     }
                 )*
