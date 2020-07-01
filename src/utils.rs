@@ -147,7 +147,7 @@ macro_rules! create_binding {
                 pub
                 versioned : [<Versioned $name>],
             }
-            #[doc_comment::doc_comment("versioned properties of [", $name, "]")] 
+            ::doc_comment::doc_comment! { concat!("versioned properties of [", stringify!($name), "]") }
             $(#[$s_attr])*
             pub
             struct [<Versioned $name>] {
@@ -158,7 +158,7 @@ macro_rules! create_binding {
                 )*
             }
 
-            #[doc_comment::doc_comment("Builder to create [", $name, "], the values in the builder are optional values")] 
+            ::doc_comment::doc_comment!{ concat!("Builder to create [", stringify!($name) , "], the values in the builder are optional values") }
             $(#[$s_attr])*
             pub
             struct [<Create $name>] {
@@ -198,7 +198,9 @@ macro_rules! create_binding {
                 )*
             }
 
-            #[doc_comment::doc_comment("Builder to update [", $name, "], the values in the builder are optional values")] 
+            ::doc_comment::doc_comment! {
+                concat!("Builder to update [", stringify!($name), "], the values in the builder are optional values")
+            }
             $(#[$s_attr])*
             pub
             struct [<Update $name>] {
