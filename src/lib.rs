@@ -4,12 +4,17 @@ pub use url::Url;
 
 /// Data types to interract with the folder API
 pub mod folder;
-/// Data types and builders to interact with the passwords API
+/// Data types and builders to interact with the passwords API. Check
+/// [PasswordApi](password::PasswordApi) for the available actions. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Password-Api)
 pub mod password;
-/// Data types, helpers and builders to interact with the settings API
+/// Data types, helpers and builders to interact with the settings API. Check
+/// [SettingsApi](settings::SettingsApi) for the available actions. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Settings-Api)
 pub mod settings;
 
 mod utils;
+pub use utils::{QueryKind, SearchQuery};
 
 mod private {
     pub trait Sealed {}
@@ -32,6 +37,8 @@ pub enum Error {
     TimeError(#[from] std::time::SystemTimeError),
     #[error("setting was not valid in this context")]
     InvalidSetting,
+    #[error("serde error")]
+    Serde(#[from] serde_json::Error),
 }
 
 /// Represent how to first connect to a nextcloud instance
@@ -111,6 +118,22 @@ impl AuthenticatedApi {
         data: D,
     ) -> Result<R, reqwest::Error> {
         self.passwords_request(endpoint, reqwest::Method::POST, data)
+            .await
+    }
+    pub(crate) async fn passwords_delete<R: serde::de::DeserializeOwned, D: serde::Serialize>(
+        &self,
+        endpoint: impl AsRef<str>,
+        data: D,
+    ) -> Result<R, reqwest::Error> {
+        self.passwords_request(endpoint, reqwest::Method::DELETE, data)
+            .await
+    }
+    pub(crate) async fn passwords_patch<R: serde::de::DeserializeOwned, D: serde::Serialize>(
+        &self,
+        endpoint: impl AsRef<str>,
+        data: D,
+    ) -> Result<R, reqwest::Error> {
+        self.passwords_request(endpoint, reqwest::Method::PATCH, data)
             .await
     }
 
@@ -196,7 +219,7 @@ impl AuthenticatedApi {
             session_id: session_id.clone(),
             keepalive: 0,
         };
-        api.keepalive = api.settings().get_setting().session_lifetime().await?;
+        api.keepalive = api.settings().get().session_lifetime().await?;
         log::debug!("Session keepalive is: {}", api.keepalive);
 
         Ok((api, session_id))

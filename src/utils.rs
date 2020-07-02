@@ -44,8 +44,47 @@ macro_rules! create_details {
     };
 }
 
+// Tags: versioned, create(optional | required), update(optional | required), search
+//
 
-// Tags: versioned, create(optional | required), update(optional | required)
+#[derive(Debug)]
+pub struct SearchQuery<T: serde::Serialize> {
+    value: T,
+    query: QueryKind,
+}
+
+#[derive(Debug)]
+pub enum QueryKind {
+    Exact,
+    Equals,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessOrEqual,
+    GreaterOrEqual,
+}
+
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+pub(crate) enum Criteria {
+    Value(serde_json::Value),
+    Search(&'static str, serde_json::Value),
+}
+
+impl<T: serde::Serialize> SearchQuery<T> {
+    pub(crate) fn to_criteria(&self) -> Result<Criteria, serde_json::Error> {
+        let value = serde_json::to_value(&self.value)?;
+        Ok(match self.query {
+            QueryKind::Exact => Criteria::Value(value),
+            QueryKind::Equals => Criteria::Search("eq", value),
+            QueryKind::NotEqual => Criteria::Search("ne", value),
+            QueryKind::LessThan => Criteria::Search("lt", value),
+            QueryKind::GreaterThan => Criteria::Search("gt", value),
+            QueryKind::LessOrEqual => Criteria::Search("le", value),
+            QueryKind::GreaterOrEqual => Criteria::Search("ge", value),
+        })
+    }
+}
 
 #[doc(hidden)]
 #[macro_export]
@@ -68,6 +107,7 @@ macro_rules! create_binding {
             @create ()
             @update_new ()
             @update ()
+            @search ()
             @versioned ()
             @not_versioned ()
             $(
@@ -115,6 +155,15 @@ macro_rules! create_binding {
                     $u_field:ident : $u_type:ty
                 )
             )*
+        )
+        @search (
+            $(
+            $(
+                (
+                    $(#[$se_attr:tt])*
+                    $se_field:ident : $se_type:ty
+                )
+            )+)?
         )
         @versioned (
             $(
@@ -198,6 +247,30 @@ macro_rules! create_binding {
                 )*
             }
 
+            $(
+            #[derive(serde::Serialize, Default)]
+            pub struct [<$name Search>] {
+                $(
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    $(#[$se_attr])?
+                    $se_field: Option<crate::utils::Criteria>,
+                )+
+            }
+            impl [<$name Search>] {
+                pub fn new() -> Self {
+                    Default::default()
+                }
+                $(
+                    pub fn [<and_ $se_field>](self, query: crate::utils::SearchQuery<$se_type>) -> Result<Self, crate::Error> {
+                        Ok(Self {
+                            $se_field: Some(query.to_criteria()?),
+                            ..self
+                        })
+                    }
+                )+
+            }
+            )?
+
             ::doc_comment::doc_comment! {
                 concat!("Builder to update [", stringify!($name), "], the values in the builder are optional values")
             }
@@ -242,7 +315,7 @@ macro_rules! create_binding {
         }
     );
 
-    // Create new 
+    // Create new
     (
         @name $name:ident
         @meta $meta:tt
@@ -250,6 +323,7 @@ macro_rules! create_binding {
         @create $create:tt
         @update_new $update_new:tt
         @update $update:tt
+        @search $search:tt
         @versioned $versioned:tt
         @not_versioned $not_versioned:tt
             $current:tt [create(required) $($($tags:tt)+)?]
@@ -262,6 +336,7 @@ macro_rules! create_binding {
             @create $create
             @update_new $update_new
             @update $update
+            @search $search
             @versioned $versioned
             @not_versioned $not_versioned
                 $($current [$($tags)+])?
@@ -277,6 +352,7 @@ macro_rules! create_binding {
         @create ($($create:tt)*)
         @update_new $update_new:tt
         @update $update:tt
+        @search $search:tt
         @versioned $versioned:tt
         @not_versioned $not_versioned:tt
             $current:tt [create(optional) $($($tags:tt)+)?]
@@ -289,6 +365,7 @@ macro_rules! create_binding {
             @create ($($create)* $current)
             @update_new $update_new
             @update $update
+            @search $search
             @versioned $versioned
             @not_versioned $not_versioned
                 $($current [$($tags)+])?
@@ -304,6 +381,7 @@ macro_rules! create_binding {
         @create $create:tt
         @update_new ($($update_new:tt)*)
         @update $update:tt
+        @search $search:tt
         @versioned $versioned:tt
         @not_versioned $not_versioned:tt
             $current:tt [update(required) $($($tags:tt)+)?]
@@ -316,6 +394,7 @@ macro_rules! create_binding {
             @create $create
             @update_new ($($update_new)* $current)
             @update $update
+            @search $search
             @versioned $versioned
             @not_versioned $not_versioned
                 $($current [$($tags)+])?
@@ -323,7 +402,7 @@ macro_rules! create_binding {
         }
     );
 
-    // Update 
+    // Update
     (
         @name $name:ident
         @meta $meta:tt
@@ -331,6 +410,7 @@ macro_rules! create_binding {
         @create $create:tt
         @update_new $update_new:tt
         @update ($($update:tt)*)
+        @search $search:tt
         @versioned $versioned:tt
         @not_versioned $not_versioned:tt
             $current:tt [update(optional) $($($tags:tt)+)?]
@@ -343,6 +423,36 @@ macro_rules! create_binding {
             @create $create
             @update_new $update_new
             @update ($($update)* $current)
+            @search $search
+            @versioned $versioned
+            @not_versioned $not_versioned
+                $($current [$($tags)+])?
+                $($rest)*
+        }
+    );
+
+    // Search
+    (
+        @name $name:ident
+        @meta $meta:tt
+        @create_new $create_new:tt
+        @create $create:tt
+        @update_new $update_new:tt
+        @update $update:tt
+        @search ($($search:tt)*)
+        @versioned $versioned:tt
+        @not_versioned $not_versioned:tt
+            $current:tt [search $($($tags:tt)+)?]
+            $($rest:tt)*
+    ) => (
+        create_binding! {
+            @name $name
+            @meta $meta
+            @create_new $create_new
+            @create $create
+            @update_new $update_new
+            @update $update
+            @search ($($search)* $current)
             @versioned $versioned
             @not_versioned $not_versioned
                 $($current [$($tags)+])?
@@ -358,6 +468,7 @@ macro_rules! create_binding {
         @create $create:tt
         @update_new $update_new:tt
         @update $update:tt
+        @search $search:tt
         @versioned ( $($versioned:tt)* )
         @not_versioned $not_versioned:tt
             $current:tt [versioned $($($tags:tt)+)?]
@@ -370,6 +481,7 @@ macro_rules! create_binding {
             @create $create
             @update_new $update_new
             @update $update
+            @search $search
             @versioned ( $($versioned)* $current )
             @not_versioned $not_versioned
                 $($current [$($tags)+])?
@@ -385,6 +497,7 @@ macro_rules! create_binding {
         @create $create:tt
         @update_new $update_new:tt
         @update $update:tt
+        @search $search:tt
         @versioned $versioned:tt
         @not_versioned ( $($not_versioned:tt)* )
             $current:tt []
@@ -397,6 +510,7 @@ macro_rules! create_binding {
             @create $create
             @update_new $update_new
             @update $update
+            @search $search
             @versioned $versioned
             @not_versioned ( $($not_versioned)* $current )
                 $($rest)*

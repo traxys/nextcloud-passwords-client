@@ -8,7 +8,7 @@ pub struct SettingsApi<'a> {
 }
 
 /// Structure to query multiple settings, see
-/// [get_multiple_settings](AuthenticatedApi::get_multiple_settings)
+/// [get_multiple](SettingsApi::get_multiple)
 pub struct SettingsBuilder<'api> {
     settings: Vec<String>,
     api: &'api SettingsApi<'api>,
@@ -30,28 +30,28 @@ impl<'a> SettingsApi<'a> {
 
     /// Fetch one setting
     #[inline]
-    pub fn get_setting(&self) -> SettingsFetcher {
+    pub fn get(&self) -> SettingsFetcher {
         SettingsFetcher { api: self.api }
     }
     #[inline]
-    pub fn reset_setting(&self) -> SettingReset {
+    pub fn reset(&self) -> SettingReset {
         SettingReset { api: self.api }
     }
     /// Fetch multiple settings
     #[inline]
-    pub fn get_multiple_settings(&self) -> SettingsBuilder<'_> {
+    pub fn get_multiple(&self) -> SettingsBuilder<'_> {
         SettingsBuilder {
             api: self,
             settings: Vec::new(),
         }
     }
     /// Fetch all the settings
-    pub async fn get_all_settings(&self) -> Result<AllSettings, crate::Error> {
+    pub async fn get_all(&self) -> Result<AllSettings, crate::Error> {
         Ok(self.api.passwords_get("1.0/settings/list", ()).await?)
     }
 
     /// Set the value of a writable setting
-    pub async fn set_settings(
+    pub async fn set(
         &self,
         settings: Settings,
     ) -> Result<Vec<SettingValue>, Error> {
@@ -59,7 +59,7 @@ impl<'a> SettingsApi<'a> {
             self.api.passwords_post("1.0/settings/set", settings).await?;
         Ok(settings.to_values())
     }
-    pub async fn set_client_setting<D: Serialize + serde::de::DeserializeOwned>(
+    pub async fn set_client<D: Serialize + serde::de::DeserializeOwned>(
         &self,
         name: ClientSettings,
         value: D,
