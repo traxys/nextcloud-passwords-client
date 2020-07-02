@@ -1,6 +1,89 @@
-use crate::AuthenticatedApi;
+use crate::{AuthenticatedApi, Error};
 use serde::{Deserialize, Serialize};
 use url::Url;
+
+/// Settings API methods
+pub struct SettingsApi<'a> {
+    pub(crate) api: &'a AuthenticatedApi,
+}
+
+/// Structure to query multiple settings, see
+/// [get_multiple_settings](AuthenticatedApi::get_multiple_settings)
+pub struct SettingsBuilder<'api> {
+    settings: Vec<String>,
+    api: &'api SettingsApi<'api>,
+}
+
+impl<'api> SettingsBuilder<'api> {
+    #[inline]
+    pub fn get(mut self, setting: impl Setting) -> Self {
+        self.settings.push(setting.name());
+        self
+    }
+    pub async fn query(self) -> Result<Vec<SettingValue>, Error> {
+        let api = self.api;
+        api.query_settings(self).await
+    }
+}
+
+impl<'a> SettingsApi<'a> {
+
+    /// Fetch one setting
+    #[inline]
+    pub fn get_setting(&self) -> SettingsFetcher {
+        SettingsFetcher { api: self.api }
+    }
+    #[inline]
+    pub fn reset_setting(&self) -> SettingReset {
+        SettingReset { api: self.api }
+    }
+    /// Fetch multiple settings
+    #[inline]
+    pub fn get_multiple_settings(&self) -> SettingsBuilder<'_> {
+        SettingsBuilder {
+            api: self,
+            settings: Vec::new(),
+        }
+    }
+    /// Fetch all the settings
+    pub async fn get_all_settings(&self) -> Result<AllSettings, crate::Error> {
+        Ok(self.api.passwords_get("1.0/settings/list", ()).await?)
+    }
+
+    /// Set the value of a writable setting
+    pub async fn set_settings(
+        &self,
+        settings: Settings,
+    ) -> Result<Vec<SettingValue>, Error> {
+        let settings: Settings =
+            self.api.passwords_post("1.0/settings/set", settings).await?;
+        Ok(settings.to_values())
+    }
+    pub async fn set_client_setting<D: Serialize + serde::de::DeserializeOwned>(
+        &self,
+        name: ClientSettings,
+        value: D,
+    ) -> Result<D, Error> {
+        type ClientData<D> = std::collections::HashMap<String, D>;
+        let mut data = ClientData::new();
+        data.insert(name.name.clone(), value);
+        let mut data: ClientData<D> = self.api.passwords_post("1.0/settings/set", data).await?;
+        Ok(data
+            .remove(&name.name)
+            .expect("server did not set client setting"))
+    }
+
+    async fn query_settings(
+        &self,
+        settings: SettingsBuilder<'_>,
+    ) -> Result<Vec<SettingValue>, Error> {
+        let data: Settings = self.api
+            .passwords_post("1.0/settings/get", settings.settings)
+            .await?;
+        Ok(data.to_values())
+    }
+
+}
 
 /// Fetch a single setting
 pub struct SettingsFetcher<'api> {

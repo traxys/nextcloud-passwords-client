@@ -1,6 +1,60 @@
-use crate::{create_binding, create_details};
+use crate::{create_binding, create_details, Error};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+
+/// Password related actions
+pub struct PasswordApi<'a> {
+    pub(crate) api: &'a crate::AuthenticatedApi,
+}
+
+impl<'a> PasswordApi<'a> {
+    /// Get a single password with it's ID
+    pub async fn get_password(
+        &self,
+        details: Option<Details>,
+        id: &str,
+    ) -> Result<Password, Error> {
+        #[derive(Serialize, Deserialize)]
+        struct ShowPassword<'a> {
+            id: &'a str,
+            details: String,
+        }
+        let request = ShowPassword {
+            id,
+            details: details.unwrap_or_else(Default::default).to_string(),
+        };
+        self.api.passwords_post("1.0/password/show", request)
+            .await
+            .map_err(Into::into)
+    }
+    /// List all the passwords known for this user
+    pub async fn list_passwords(
+        &self,
+        details: Details,
+    ) -> Result<Vec<Password>, Error> {
+        #[derive(Serialize, Deserialize)]
+        struct Details {
+            details: String,
+        }
+        Ok(self.api
+            .passwords_post(
+                "1.0/password/list",
+                Details {
+                    details: details.to_string(),
+                },
+            )
+            .await?)
+    }
+    /// Create a password
+    pub async fn create_password(
+        &self,
+        password: CreatePassword,
+    ) -> Result<PasswordCreated, Error> {
+        self.api.passwords_post("1.0/password/create", password)
+            .await
+            .map_err(Into::into)
+    }
+}
 
 create_details! {
     pub struct Details {

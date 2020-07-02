@@ -73,24 +73,6 @@ pub struct AuthenticatedApi {
     password: String,
 }
 
-/// Structure to query multiple settings, see
-/// [get_multiple_settings](AuthenticatedApi::get_multiple_settings)
-pub struct SettingsBuilder<'api> {
-    settings: Vec<String>,
-    api: &'api AuthenticatedApi,
-}
-
-impl<'api> SettingsBuilder<'api> {
-    pub fn get(mut self, setting: impl settings::Setting) -> Self {
-        self.settings.push(setting.name());
-        self
-    }
-    pub async fn query(self) -> Result<Vec<settings::SettingValue>, Error> {
-        let api = self.api;
-        api.query_settings(self).await
-    }
-}
-
 impl AuthenticatedApi {
     /// Return the URL of the nextcloud instance
     pub fn server(&self) -> &Url {
@@ -115,7 +97,7 @@ impl AuthenticatedApi {
             .json::<R>()
             .await
     }
-    async fn passwords_get<R: serde::de::DeserializeOwned, D: serde::Serialize>(
+    pub(crate) async fn passwords_get<R: serde::de::DeserializeOwned, D: serde::Serialize>(
         &self,
         endpoint: impl AsRef<str>,
         data: D,
@@ -123,7 +105,7 @@ impl AuthenticatedApi {
         self.passwords_request(endpoint, reqwest::Method::GET, data)
             .await
     }
-    async fn passwords_post<R: serde::de::DeserializeOwned, D: serde::Serialize>(
+    pub(crate) async fn passwords_post<R: serde::de::DeserializeOwned, D: serde::Serialize>(
         &self,
         endpoint: impl AsRef<str>,
         data: D,
@@ -132,57 +114,17 @@ impl AuthenticatedApi {
             .await
     }
 
-    /// Fetch one setting
-    pub fn get_setting(&self) -> settings::SettingsFetcher {
-        settings::SettingsFetcher { api: self }
+    /// Access the Password API
+    #[inline]
+    pub fn password(&self) -> password::PasswordApi<'_> {
+        password::PasswordApi { api: self }
     }
-    pub fn reset_setting(&self) -> settings::SettingReset {
-        settings::SettingReset { api: self }
-    }
-    /// Fetch multiple settings
-    pub fn get_multiple_settings(&self) -> SettingsBuilder<'_> {
-        SettingsBuilder {
-            api: self,
-            settings: Vec::new(),
-        }
-    }
-    /// Fetch all the settings
-    pub async fn get_all_settings(&self) -> Result<settings::AllSettings, crate::Error> {
-        Ok(self.passwords_get("1.0/settings/list", ()).await?)
+    /// Access the Settings API
+    #[inline]
+    pub fn settings(&self) -> settings::SettingsApi<'_> {
+        settings::SettingsApi { api: self }
     }
 
-    /// Set the value of a writable setting
-    pub async fn set_settings(
-        &self,
-        settings: settings::Settings,
-    ) -> Result<Vec<settings::SettingValue>, Error> {
-        let settings: settings::Settings =
-            self.passwords_post("1.0/settings/set", settings).await?;
-        Ok(settings.to_values())
-    }
-    pub async fn set_client_setting<D: Serialize + serde::de::DeserializeOwned>(
-        &self,
-        name: settings::ClientSettings,
-        value: D,
-    ) -> Result<D, Error> {
-        type ClientData<D> = std::collections::HashMap<String, D>;
-        let mut data = ClientData::new();
-        data.insert(name.name.clone(), value);
-        let mut data: ClientData<D> = self.passwords_post("1.0/settings/set", data).await?;
-        Ok(data
-            .remove(&name.name)
-            .expect("server did not set client setting"))
-    }
-
-    async fn query_settings(
-        &self,
-        settings: SettingsBuilder<'_>,
-    ) -> Result<Vec<settings::SettingValue>, Error> {
-        let data: settings::Settings = self
-            .passwords_post("1.0/settings/get", settings.settings)
-            .await?;
-        Ok(data.to_values())
-    }
     /// Resume a connection to the API using the state. Also gives the session ID
     pub async fn resume_session(resume_state: ResumeState) -> Result<(Self, String), Error> {
         if resume_state.shutdown_time.elapsed()?.as_secs() > resume_state.keepalive {
@@ -254,7 +196,7 @@ impl AuthenticatedApi {
             session_id: session_id.clone(),
             keepalive: 0,
         };
-        api.keepalive = api.get_setting().session_lifetime().await?;
+        api.keepalive = api.settings().get_setting().session_lifetime().await?;
         log::debug!("Session keepalive is: {}", api.keepalive);
 
         Ok((api, session_id))
@@ -273,33 +215,6 @@ impl AuthenticatedApi {
         } else {
             Ok(())
         }
-    }
-
-    /// List all the passwords known for this user
-    pub async fn list_passwords(
-        &self,
-        details: password::Details,
-    ) -> Result<Vec<password::Password>, Error> {
-        #[derive(Serialize, Deserialize)]
-        struct Details {
-            details: String,
-        }
-        Ok(self
-            .passwords_post(
-                "1.0/password/list",
-                Details {
-                    details: details.to_string(),
-                },
-            )
-            .await?)
-    }
-    pub async fn create_password(
-        &self,
-        password: password::CreatePassword,
-    ) -> Result<password::PasswordCreated, Error> {
-        self.passwords_post("1.0/password/create", password)
-            .await
-            .map_err(Into::into)
     }
 
     /// Get the state to be able to resume this session
