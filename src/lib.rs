@@ -2,7 +2,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 pub use url::Url;
 
-/// Data types to interract with the folder API
+/// Data types to interract with the folder API. Check [FolderApi](folder::FolderApi) for the
+/// available actions. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Folder-Api)
 pub mod folder;
 /// Data types and builders to interact with the passwords API. Check
 /// [PasswordApi](password::PasswordApi) for the available actions. You can also check the [HTTP
@@ -146,6 +148,11 @@ impl AuthenticatedApi {
     #[inline]
     pub fn settings(&self) -> settings::SettingsApi<'_> {
         settings::SettingsApi { api: self }
+    }
+    /// Access the Folder API
+    #[inline]
+    pub fn folder(&self) -> folder::FolderApi<'_> {
+        folder::FolderApi { api: self }
     }
 
     /// Resume a connection to the API using the state. Also gives the session ID

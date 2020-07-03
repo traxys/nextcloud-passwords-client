@@ -163,7 +163,7 @@ impl<'a> PasswordApi<'a> {
     ///  - If the revision is set, the password will only be deleted if that revision is the current revision.
     ///  Otherwise an "Outdated revision id" error is returned. 
     ///  This way, a password is not accidentally deleted instead of trashed if the client is out of sync.
-    pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<TrashedIdentifer, Error> {
+    pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<TrashedIdentifier, Error> {
         #[derive(Serialize)]
         struct Request {
             id: uuid::Uuid,
@@ -193,7 +193,7 @@ pub struct PasswordIdentifier {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct TrashedIdentifer {
+pub struct TrashedIdentifier {
     pub id: uuid::Uuid,
     pub revision: Option<uuid::Uuid>,
 }

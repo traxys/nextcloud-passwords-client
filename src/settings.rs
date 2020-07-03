@@ -29,15 +29,24 @@ impl<'api> SettingsBuilder<'api> {
 impl<'a> SettingsApi<'a> {
 
     /// Fetch one setting
+    /// Notes
+    ///  - If the setting is not defined, it will default to null
+    ///  - Accessing an undefined setting in the client scope will not create it
     #[inline]
     pub fn get(&self) -> SettingsFetcher {
         SettingsFetcher { api: self.api }
     }
+    /// Notes
+    ///  - If you reset a setting in the client scope, it will be deleted and no longer appear in the list action
+    ///  - If the setting does not exist, the value will be null
     #[inline]
     pub fn reset(&self) -> SettingReset {
         SettingReset { api: self.api }
     }
     /// Fetch multiple settings
+    /// Notes
+    ///  - If the setting is not defined, it will default to null
+    ///  - Accessing an undefined setting in the client scope will not create it
     #[inline]
     pub fn get_multiple(&self) -> SettingsBuilder<'_> {
         SettingsBuilder {
@@ -59,6 +68,9 @@ impl<'a> SettingsApi<'a> {
             self.api.passwords_post("1.0/settings/set", settings).await?;
         Ok(settings.to_values())
     }
+    /// Set the value of a client setting
+    /// Note
+    ///  - If the size limitations of the client scope are exceeded, an error will be returned
     pub async fn set_client<D: Serialize + serde::de::DeserializeOwned>(
         &self,
         name: ClientSettings,
@@ -207,10 +219,15 @@ macro_rules! settings {
                     Ok(data.$server_field.expect("server did not provide the asked setting"))
                 }
             )*
+            /// Note
+            ///  - The client scope allows keys with up to 48 characters, excluding client.
+            ///  - The client scope allows values with a maximum length of 128 characters
+            ///  - The client scope is shared between all clients
             pub async fn client_setting<D: serde::de::DeserializeOwned>(&self, client_setting: ClientSettings) -> Result<Option<D>, crate::Error> {
                 let mut data: std::collections::HashMap<String, Option<D>> = self.api.passwords_post("1.0/settings/get", vec![client_setting.name()]).await?;
                 Ok(data.remove(&client_setting.name()).flatten())
             }
+            /// Fetch setting (expected SettingVariant::Client) from it's name
             pub async fn from_variant(&self, variant: SettingVariant) -> Result<SettingValue, crate::Error> {
                 match variant {
                     SettingVariant::Client => Err(crate::Error::InvalidSetting),
