@@ -165,7 +165,7 @@ pub struct TrashedIdentifier {
 create_details! {
     pub struct Details {
         pub revisions: bool,
-        pub parent: bool,
+        //pub parent: bool,
         pub folders: bool,
         pub passwords: bool,
         pub tags: bool,
@@ -192,5 +192,9 @@ pub struct Folder {
     pub hidden: bool [versioned create(optional) update(optional)],
     pub trashed: bool [versioned search],
     pub favorite: bool [versioned create(optional) update(optional) search],
+
+    pub revisions: Option<Vec<VersionedFolder>> [],
+    pub folders: Option<Vec<Folder>> [],
+    pub passwords: Option<Vec<crate::password::Password>> [],
 }
 }
