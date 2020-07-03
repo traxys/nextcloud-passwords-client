@@ -14,6 +14,10 @@ pub mod password;
 /// [SettingsApi](settings::SettingsApi) for the available actions. You can also check the [HTTP
 /// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Settings-Api)
 pub mod settings;
+/// Data types, helpers and builders to interact with the tag API. Check
+/// [TagApi](tag::TagApi) for the available actions. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Tag-Api)
+pub mod tag;
 
 mod utils;
 pub use utils::{QueryKind, SearchQuery};
@@ -24,6 +28,74 @@ mod private {
     impl Sealed for super::settings::UserSettings {}
     impl Sealed for super::settings::ServerSettings {}
     impl Sealed for super::settings::ClientSettings {}
+}
+
+#[derive(Debug)]
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+impl std::fmt::Display for Color {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "#{:02x}{:02x}{:02x}", self.red, self.green, self.blue)
+    }
+}
+impl Serialize for Color {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&format!(
+            "#{:02x}{:02x}{:02x}",
+            self.red, self.green, self.blue
+        ))
+    }
+}
+
+impl<'de> Deserialize<'de> for Color {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct StrVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for StrVisitor {
+            type Value = Color;
+
+            fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(fmt, "an hex color of the form #abcdef as a string")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if value.len() == 7 {
+                    if !value.starts_with('#') {
+                        Err(E::custom("expected the color to start with `#`"))
+                    } else {
+                        let mut result = [0u8; 3];
+                        hex::decode_to_slice(value.trim_start_matches('#'), &mut result).map_err(
+                            |e| E::custom(format!("Could not parse hex string: {:?}", e)),
+                        )?;
+                        Ok(Color {
+                            red: result[0],
+                            green: result[1],
+                            blue: result[2],
+                        })
+                    }
+                } else {
+                    Err(E::custom(format!(
+                        "Expected a string of length 7, got length: {}",
+                        value.len()
+                    )))
+                }
+            }
+        }
+
+        deserializer.deserialize_str(StrVisitor)
+    }
 }
 
 /// Errors
@@ -41,6 +113,22 @@ pub enum Error {
     InvalidSetting,
     #[error("serde error")]
     Serde(#[from] serde_json::Error),
+    #[error("endpoint error: {}", .0.message)]
+    EndpointError(EndpointError),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EndpointError {
+    status: String,
+    id: u64,
+    message: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EndpointResponse<T> {
+    Error(EndpointError),
+    Success(T),
 }
 
 /// Represent how to first connect to a nextcloud instance
@@ -92,8 +180,9 @@ impl AuthenticatedApi {
         endpoint: impl AsRef<str>,
         method: reqwest::Method,
         data: D,
-    ) -> Result<R, reqwest::Error> {
-        self.client
+    ) -> Result<R, Error> {
+        let r = self
+            .client
             .request(
                 method,
                 &format!("{}/{}", self.passwords_url, endpoint.as_ref()),
@@ -102,15 +191,19 @@ impl AuthenticatedApi {
             .header("X-API-SESSION", &self.session_id)
             .basic_auth(&self.login, Some(&self.password))
             .send()
-            .await?
-            .json::<R>()
-            .await
+            .await?;
+        let resp = r.json::<EndpointResponse<R>>().await?;
+        //dbg!(r.text().await?);
+        match resp {
+            EndpointResponse::Success(r) => Ok(r),
+            EndpointResponse::Error(e) => Err(Error::EndpointError(e)),
+        }
     }
     pub(crate) async fn passwords_get<R: serde::de::DeserializeOwned, D: serde::Serialize>(
         &self,
         endpoint: impl AsRef<str>,
         data: D,
-    ) -> Result<R, reqwest::Error> {
+    ) -> Result<R, Error> {
         self.passwords_request(endpoint, reqwest::Method::GET, data)
             .await
     }
@@ -118,7 +211,7 @@ impl AuthenticatedApi {
         &self,
         endpoint: impl AsRef<str>,
         data: D,
-    ) -> Result<R, reqwest::Error> {
+    ) -> Result<R, Error> {
         self.passwords_request(endpoint, reqwest::Method::POST, data)
             .await
     }
@@ -126,7 +219,7 @@ impl AuthenticatedApi {
         &self,
         endpoint: impl AsRef<str>,
         data: D,
-    ) -> Result<R, reqwest::Error> {
+    ) -> Result<R, Error> {
         self.passwords_request(endpoint, reqwest::Method::DELETE, data)
             .await
     }
@@ -134,7 +227,7 @@ impl AuthenticatedApi {
         &self,
         endpoint: impl AsRef<str>,
         data: D,
-    ) -> Result<R, reqwest::Error> {
+    ) -> Result<R, Error> {
         self.passwords_request(endpoint, reqwest::Method::PATCH, data)
             .await
     }

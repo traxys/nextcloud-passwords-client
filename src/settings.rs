@@ -1,4 +1,4 @@
-use crate::{AuthenticatedApi, Error};
+use crate::{AuthenticatedApi, Error, Color};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -514,9 +514,9 @@ settings! {
         Server: Resharing(bool), resharing => "server.sharing.resharing",
         Server: AutoComplete(bool), autocomplete => "server.sharing.autocomplete",
         Server: SharingTypes(Vec<String>), sharing_types => "server.sharing.types",
-        Server: PrimaryColor(String), primary_color => "server.theme.color.primary",
-        Server: TextColor(String), text_color => "server.theme.color.text",
-        Server: BackgroundColor(String), background_color => "server.theme.color.background",
+        Server: PrimaryColor(Color), primary_color => "server.theme.color.primary",
+        Server: TextColor(Color), text_color => "server.theme.color.text",
+        Server: BackgroundColor(Color), background_color => "server.theme.color.background",
         Server: BackgroundTheme(Url), background_theme => "server.theme.background",
         Server: Logo(Url), logo => "server.theme.logo",
         Server: Label(String), label => "server.theme.label",

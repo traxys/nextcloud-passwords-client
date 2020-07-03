@@ -85,6 +85,179 @@ impl<T: serde::Serialize> SearchQuery<T> {
         })
     }
 }
+/*
+
+    TEMPLATE UTILISATION
+
+create_calls! {
+    PasswordApi where 
+        Endpoint = "1.0/password",
+        Details: Details,
+        Type: Password,
+        Create: CreatePassword,
+        Update: UpdatePassword,
+        Error: Error,
+        Identifier: PasswordIdentifier,
+        Trashed: TrashedIdentifier,
+        Criteria: PasswordSearch 
+    {
+        pub async fn list(&self, details: Option<Details>) -> Result<Vec<Type>, Error>;
+
+        pub async fn get(&self, details: Option<Details>, id: uuid::Uuid) -> Result<Type, Error>;
+
+        pub async fn find(&self, criteria: Criteria, details: Option<Details>) -> Result<Vec<Type>, Error>;
+
+        pub async fn create(&self, value: Create) -> Result<Identifier, Error>;
+
+        pub async fn update(&self, value: Update) -> Result<Identifier, Error>;
+
+        pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<Trashed, Error>;
+
+        pub async fn restore(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<Identifier, Error>;
+    }
+}
+
+ */
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! create_calls {
+    (
+        $base:ident where
+            Endpoint = $endpoint:expr,
+            Details: $details:ty,
+            Type: $ty:ty,
+            Create: $create:ty,
+            Update: $update:ty,
+            Error: $err:ty,
+            Identifier: $ident:ty,
+            Trashed: $trashed:ty,
+            Criteria: $criteria:ty $(,)?
+        {
+
+            $(#[$meta_list:meta])*
+            pub async fn list(&self, details: Option<Details>) -> Result<Vec<Type>, Error>;
+            $(#[$meta_get:meta])*
+            pub async fn get(&self, details: Option<Details>, id: uuid::Uuid) -> Result<Type, Error>;
+            $(#[$meta_find:meta])*
+            pub async fn find(&self, criteria: Criteria, details: Option<Details>) -> Result<Vec<Type>, Error>;
+            $(#[$meta_create:meta])*
+            pub async fn create(&self, value: Create) -> Result<Identifier, Error>;
+            $(#[$meta_update:meta])*
+            pub async fn update(&self, value: Update) -> Result<Identifier, Error>;
+            $(#[$meta_delete:meta])*
+            pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<Trashed, Error>;
+            $(#[$meta_restore:meta])*
+            pub async fn restore(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<Identifier, Error>;
+        }
+    ) => {
+        ::doc_comment::doc_comment! { concat!("Actions on the ", stringify!($base), " API"),
+        pub struct $base<'a> {
+            pub(crate) api: &'a crate::AuthenticatedApi,
+        }}
+
+        impl<'a> $base<'a> {
+            $(#[$meta_list])*
+            pub async fn list(&self, details: Option<$details>) -> Result<Vec<$ty>, $err> {
+                #[derive(serde::Serialize, serde::Deserialize)]
+                struct DetailsStr {
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    details: Option<String>,
+                }
+                self.api
+                    .passwords_post(
+                        concat!($endpoint, "/list"),
+                        DetailsStr {
+                            details: details.map(|d| d.to_string()),
+                        },
+                    )
+                    .await
+            }
+
+            $(#[$meta_get])*
+            pub async fn get(&self, details: Option<$details>, id: uuid::Uuid) -> Result<$ty, Error> {
+                #[derive(Serialize, Deserialize)]
+                struct Show {
+                    id: uuid::Uuid,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    details: Option<String>,
+                }
+                let request = Show {
+                    id,
+                    details: details.map(|d| d.to_string()),
+                };
+                self.api
+                    .passwords_post(concat!($endpoint, "/show"), request)
+                    .await
+            }
+
+            $(#[$meta_find])*
+            pub async fn find(
+                &self,
+                criteria: $criteria,
+                details: Option<$details>,
+            ) -> Result<Vec<$ty>, $err> {
+                #[derive(Serialize)]
+                struct Request {
+                    criteria: $criteria,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    details: Option<String>,
+                }
+                let request = Request {
+                    criteria,
+                    details: details.map(|d| d.to_string()),
+                };
+                self.api
+                    .passwords_post(concat!($endpoint, "/find"), request)
+                    .await
+            }
+
+            $(#[$meta_create])*
+            pub async fn create(&self, value: $create) -> Result<$ident, $err> {
+                self.api
+                    .passwords_post(concat!($endpoint, "/create"), value)
+                    .await
+            }
+
+            $(#[$meta_update])*
+            pub async fn update(&self, folder: $update) -> Result<$ident, $err> {
+                self.api
+                    .passwords_post(concat!($endpoint, "/update"), folder)
+                    .await
+            }
+
+            $(#[$meta_delete])*
+            pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<$trashed, $err> {
+                #[derive(Serialize)]
+                struct Request {
+                    id: uuid::Uuid,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    revision: Option<uuid::Uuid>,
+                }
+                self.api
+                    .passwords_delete(concat!($endpoint, "/delete"), Request { id, revision })
+                    .await
+            }
+
+            $(#[$meta_restore])*
+            pub async fn restore(
+                &self,
+                id: uuid::Uuid,
+                revision: Option<uuid::Uuid>,
+            ) -> Result<$ident, $err> {
+                #[derive(Serialize)]
+                struct Request {
+                    id: uuid::Uuid,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    revision: Option<uuid::Uuid>,
+                }
+                self.api
+                    .passwords_patch(concat!($endpoint, "/restore"), Request { id, revision })
+                    .await
+            }
+        }
+    };
+}
 
 #[doc(hidden)]
 #[macro_export]
@@ -196,7 +369,7 @@ macro_rules! create_binding {
                 pub
                 versioned : [<Versioned $name>],
             }
-            ::doc_comment::doc_comment! { concat!("versioned properties of [", stringify!($name), "]") }
+            ::doc_comment::doc_comment! { concat!("versioned properties of [", stringify!($name), "]"),
             $(#[$s_attr])*
             pub
             struct [<Versioned $name>] {
@@ -206,8 +379,9 @@ macro_rules! create_binding {
                     $v_field : $v_type,
                 )*
             }
+            }
 
-            ::doc_comment::doc_comment!{ concat!("Builder to create [", stringify!($name) , "], the values in the builder are optional values") }
+            ::doc_comment::doc_comment!{ concat!("Builder to create [", stringify!($name) , "], the values in the builder are optional values"),
             $(#[$s_attr])*
             pub
             struct [<Create $name>] {
@@ -220,6 +394,7 @@ macro_rules! create_binding {
                     pub
                     $c_field : Option<$c_type>,
                 )*
+            }
             }
 
             impl [<Create $name>] {
@@ -248,6 +423,8 @@ macro_rules! create_binding {
             }
 
             $(
+            ::doc_comment::doc_comment! {
+                "Builder to add search criterias (see the `find` method)",
             #[derive(serde::Serialize, Default)]
             pub struct [<$name Search>] {
                 $(
@@ -255,6 +432,7 @@ macro_rules! create_binding {
                     $(#[$se_attr])?
                     $se_field: Option<crate::utils::Criteria>,
                 )+
+            }
             }
             impl [<$name Search>] {
                 pub fn new() -> Self {
@@ -272,8 +450,7 @@ macro_rules! create_binding {
             )?
 
             ::doc_comment::doc_comment! {
-                concat!("Builder to update [", stringify!($name), "], the values in the builder are optional values")
-            }
+                concat!("Builder to update [", stringify!($name), "], the values in the builder are optional values"),
             $(#[$s_attr])*
             pub
             struct [<Update $name>] {
@@ -286,6 +463,7 @@ macro_rules! create_binding {
                     pub
                     $u_field : Option<$u_type>,
                 )*
+            }
             }
 
             impl [<Update $name>] {
