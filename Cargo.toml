@@ -3,6 +3,13 @@ name = "nextcloud-passwords-client"
 version = "0.1.0"
 authors = ["Quentin Boyer <qbsecond@gmail.com>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/traxys/nextcloud-passwords-client/"
+description = """
+Bindings to the nextcloud passwords HTTP API
+"""
+categories = ["api-bindings"]
+keywords = ["nextcloud", "passwords"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
