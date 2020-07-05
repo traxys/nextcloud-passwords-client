@@ -5,6 +5,7 @@ A binding to the [Nextcloud Passwords API](https://git.mdns.eu/nextcloud/passwor
 ## What is implemented
 
 Evrything related to the passwords, folders, shares, services.
+Login with login flow v2.
 
 ## What is not implemented
 
