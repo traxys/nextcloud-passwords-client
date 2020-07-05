@@ -150,7 +150,8 @@ pub enum EndpointResponse<T> {
 
 /// Represent how to first connect to a nextcloud instance
 /// The best way to obtain some is using [Login flow
-/// v2](https://docs.nextcloud.com/server/19/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2)
+/// v2](https://docs.nextcloud.com/server/19/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2).
+/// You can use [register_login_flow_2](LoginDetails::register_login_flow_2) to do this authentication
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoginDetails {
     pub server: Url,
@@ -161,6 +162,9 @@ pub struct LoginDetails {
 }
 
 impl LoginDetails {
+    /// Login with the login flow v2 to the server. The `auth_callback` is given the URL where the
+    /// user will grant the permissions, this function should not block (or the authentication will
+    /// never finish) waiting for the end of the login_flow.
     pub async fn register_login_flow_2(
         server: Url,
         mut auth_callback: impl FnMut(Url),
