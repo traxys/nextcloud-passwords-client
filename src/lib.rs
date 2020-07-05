@@ -27,6 +27,12 @@ pub mod share;
 /// [TagApi](tag::TagApi) for the available actions. You can also check the [HTTP
 /// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Tag-Api)
 pub mod tag;
+/// Data types and helpers to access the Token API. Check [TokenApi](token::TokenApi) for the
+/// available actions. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Token-Api)
+pub mod token;
+
+// TODO: sort the session required methods from the non-session required
 
 mod utils;
 pub use utils::{QueryKind, SearchQuery};
