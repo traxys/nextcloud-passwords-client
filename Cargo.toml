@@ -1,6 +1,6 @@
 [package]
 name = "nextcloud-passwords-client"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Quentin Boyer <qbsecond@gmail.com>"]
 edition = "2018"
 license = "MIT"

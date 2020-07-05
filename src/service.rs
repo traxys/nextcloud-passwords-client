@@ -209,7 +209,7 @@ impl GeneratePassword {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GenerateResponse {
     pub password: String,
-    pub words: String,
+    pub words: Vec<String>,
     pub strength: u8,
     pub numbers: bool,
     pub special: bool,
