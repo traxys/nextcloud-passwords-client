@@ -10,19 +10,23 @@ pub mod folder;
 /// [PasswordApi](password::PasswordApi) for the available actions. You can also check the [HTTP
 /// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Password-Api)
 pub mod password;
+/// Actions available for the service API. Check [ServiceApi](service::ServiceApi) for more
+/// information. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Service-Api)
+pub mod service;
 /// Data types, helpers and builders to interact with the settings API. Check
 /// [SettingsApi](settings::SettingsApi) for the available actions. You can also check the [HTTP
 /// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Settings-Api)
 pub mod settings;
-/// Data types, helpers and builders to interact with the tag API. Check
-/// [TagApi](tag::TagApi) for the available actions. You can also check the [HTTP
-/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Tag-Api)
-pub mod tag;
 /// Data types, helpers and builders to interact with the share API. Check
 /// [ShareApi](share::ShareApi) for the available actions. You can also check the [HTTP
 /// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Share-Api) for more
 /// information.
 pub mod share;
+/// Data types, helpers and builders to interact with the tag API. Check
+/// [TagApi](tag::TagApi) for the available actions. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Tag-Api)
+pub mod tag;
 
 mod utils;
 pub use utils::{QueryKind, SearchQuery};
@@ -180,14 +184,13 @@ impl AuthenticatedApi {
     pub fn server(&self) -> &Url {
         &self.server_url
     }
-    async fn passwords_request<R: serde::de::DeserializeOwned, D: serde::Serialize>(
+    async fn reqwest<D: serde::Serialize>(
         &self,
         endpoint: impl AsRef<str>,
         method: reqwest::Method,
         data: D,
-    ) -> Result<R, Error> {
-        let r = self
-            .client
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        self.client
             .request(
                 method,
                 &format!("{}/{}", self.passwords_url, endpoint.as_ref()),
@@ -196,7 +199,24 @@ impl AuthenticatedApi {
             .header("X-API-SESSION", &self.session_id)
             .basic_auth(&self.login, Some(&self.password))
             .send()
-            .await?;
+            .await
+    }
+    pub(crate) async fn bytes_request<D: serde::Serialize>(
+        &self,
+        endpoint: impl AsRef<str>,
+        method: reqwest::Method,
+        data: D,
+    ) -> Result<bytes::Bytes, Error> {
+        let r = self.reqwest(endpoint, method, data).await?;
+        r.bytes().await.map_err(Into::into)
+    }
+    async fn passwords_request<R: serde::de::DeserializeOwned, D: serde::Serialize>(
+        &self,
+        endpoint: impl AsRef<str>,
+        method: reqwest::Method,
+        data: D,
+    ) -> Result<R, Error> {
+        let r = self.reqwest(endpoint, method, data).await?;
         let resp = r.json::<EndpointResponse<R>>().await?;
         //dbg!(r.text().await?);
         match resp {
@@ -251,6 +271,15 @@ impl AuthenticatedApi {
     #[inline]
     pub fn folder(&self) -> folder::FolderApi<'_> {
         folder::FolderApi { api: self }
+    }
+    /// Access the Share API
+    #[inline]
+    pub fn share(&self) -> share::ShareApi<'_> {
+        share::ShareApi { api: self }
+    }
+    #[inline]
+    pub fn service(&self) -> service::ServiceApi<'_> {
+        service::ServiceApi { api: self }
     }
 
     /// Resume a connection to the API using the state. Also gives the session ID
