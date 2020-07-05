@@ -130,6 +130,8 @@ pub enum Error {
     Serde(#[from] serde_json::Error),
     #[error("endpoint error: {}", .0.message)]
     EndpointError(EndpointError),
+    #[error("error in the login flow: request returned {0}")]
+    LoginFlowError(u16),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -156,6 +158,60 @@ pub struct LoginDetails {
     pub login_name: String,
     #[serde(rename = "appPassword")]
     pub app_password: String,
+}
+
+impl LoginDetails {
+    pub async fn register_login_flow_2(
+        server: Url,
+        mut auth_callback: impl FnMut(Url),
+    ) -> Result<Self, Error> {
+        #[derive(Deserialize)]
+        struct Poll {
+            token: String,
+            endpoint: Url,
+        }
+        #[derive(Deserialize)]
+        struct PollRequest {
+            poll: Poll,
+            login: Url,
+        }
+        #[derive(Serialize)]
+        struct Token {
+            token: String,
+        }
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(&format!("{}/login/v2/poll", server))
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            return Err(Error::LoginFlowError(resp.status().as_u16()));
+        }
+
+        let resp: PollRequest = resp.json().await?;
+        log::debug!("Got poll request for login_flow_v2");
+        auth_callback(resp.login);
+        let token = Token {
+            token: resp.poll.token,
+        };
+        let details: LoginDetails = loop {
+            let poll = client
+                .post(resp.poll.endpoint.as_str())
+                .form(&token)
+                .send()
+                .await?;
+            log::debug!("Polled endpoint");
+            match poll.status().as_u16() {
+                404 => {
+                    log::debug!("Not ready, need to retry");
+                    tokio::time::delay_for(std::time::Duration::from_millis(100)).await
+                }
+                200 => break poll.json().await?,
+                code => return Err(Error::LoginFlowError(code)),
+            }
+        };
+        Ok(details)
+    }
 }
 
 /// The state needed to re-connect to a nextcloud instance
