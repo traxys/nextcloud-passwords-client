@@ -18,6 +18,11 @@ pub mod settings;
 /// [TagApi](tag::TagApi) for the available actions. You can also check the [HTTP
 /// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Tag-Api)
 pub mod tag;
+/// Data types, helpers and builders to interact with the share API. Check
+/// [ShareApi](share::ShareApi) for the available actions. You can also check the [HTTP
+/// API](https://git.mdns.eu/nextcloud/passwords/wikis/Developers/Api/Share-Api) for more
+/// information.
+pub mod share;
 
 mod utils;
 pub use utils::{QueryKind, SearchQuery};

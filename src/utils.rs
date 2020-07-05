@@ -134,21 +134,47 @@ macro_rules! create_calls {
             Trashed: $trashed:ty,
             Criteria: $criteria:ty $(,)?
         {
-
+            $(
+            List;
             $(#[$meta_list:meta])*
             pub async fn list(&self, details: Option<Details>) -> Result<Vec<Type>, Error>;
+            )?
+
+            $(
+            Get;
             $(#[$meta_get:meta])*
             pub async fn get(&self, details: Option<Details>, id: uuid::Uuid) -> Result<Type, Error>;
+            )?
+
+            $(
+            Find;
             $(#[$meta_find:meta])*
             pub async fn find(&self, criteria: Criteria, details: Option<Details>) -> Result<Vec<Type>, Error>;
+            )?
+
+            $(
+            Create;
             $(#[$meta_create:meta])*
             pub async fn create(&self, value: Create) -> Result<Identifier, Error>;
+            )?
+
+            $(
+            Update;
             $(#[$meta_update:meta])*
             pub async fn update(&self, value: Update) -> Result<Identifier, Error>;
+            )?
+
+            $(
+            Delete;
             $(#[$meta_delete:meta])*
             pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<Trashed, Error>;
+            )?
+
+            $(
+            Restore;
             $(#[$meta_restore:meta])*
             pub async fn restore(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<Identifier, Error>;
+            )?
         }
     ) => {
         ::doc_comment::doc_comment! { concat!("Actions on the ", stringify!($base), " API"),
@@ -157,6 +183,7 @@ macro_rules! create_calls {
         }}
 
         impl<'a> $base<'a> {
+            $(
             $(#[$meta_list])*
             pub async fn list(&self, details: Option<$details>) -> Result<Vec<$ty>, $err> {
                 #[derive(serde::Serialize, serde::Deserialize)]
@@ -173,9 +200,11 @@ macro_rules! create_calls {
                     )
                     .await
             }
+            )?
 
+            $(
             $(#[$meta_get])*
-            pub async fn get(&self, details: Option<$details>, id: uuid::Uuid) -> Result<$ty, Error> {
+            pub async fn get(&self, details: Option<$details>, id: uuid::Uuid) -> Result<$ty, $err> {
                 #[derive(Serialize, Deserialize)]
                 struct Show {
                     id: uuid::Uuid,
@@ -190,7 +219,9 @@ macro_rules! create_calls {
                     .passwords_post(concat!($endpoint, "/show"), request)
                     .await
             }
+            )?
 
+            $(
             $(#[$meta_find])*
             pub async fn find(
                 &self,
@@ -211,21 +242,27 @@ macro_rules! create_calls {
                     .passwords_post(concat!($endpoint, "/find"), request)
                     .await
             }
+            )?
 
+            $(
             $(#[$meta_create])*
             pub async fn create(&self, value: $create) -> Result<$ident, $err> {
                 self.api
                     .passwords_post(concat!($endpoint, "/create"), value)
                     .await
             }
+            )?
 
+            $(
             $(#[$meta_update])*
             pub async fn update(&self, folder: $update) -> Result<$ident, $err> {
                 self.api
                     .passwords_post(concat!($endpoint, "/update"), folder)
                     .await
             }
+            )?
 
+            $(
             $(#[$meta_delete])*
             pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<$trashed, $err> {
                 #[derive(Serialize)]
@@ -238,7 +275,9 @@ macro_rules! create_calls {
                     .passwords_delete(concat!($endpoint, "/delete"), Request { id, revision })
                     .await
             }
+            )?
 
+            $(
             $(#[$meta_restore])*
             pub async fn restore(
                 &self,
@@ -255,6 +294,7 @@ macro_rules! create_calls {
                     .passwords_patch(concat!($endpoint, "/restore"), Request { id, revision })
                     .await
             }
+            )?
         }
     };
 }
@@ -299,19 +339,23 @@ macro_rules! create_binding {
         )
         @create_new (
             $(
+            $(
                 (
                     $(#[$cn_attr:tt])*
                     $cn_field:ident : $cn_type:ty
                 )
-            )*
+            )+
+            )?
         )
         @create (
+            $(
             $(
                 (
                     $(#[$c_attr:tt])*
                     $c_field:ident : $c_type:ty
                 )
-            )*
+            )+
+            )?
         )
         @update_new (
             $(
@@ -381,19 +425,20 @@ macro_rules! create_binding {
             }
             }
 
+            $(
             ::doc_comment::doc_comment!{ concat!("Builder to create [", stringify!($name) , "], the values in the builder are optional values"),
-            $(#[$s_attr])*
+            #[derive(serde::Serialize, serde::Deserialize, Debug)]
             pub
             struct [<Create $name>] {
                 $(
                     $(#[$cn_attr])*
                     $cn_field: $cn_type,
-                )*
+                )+
                 $(
                     $(#[$c_attr])*
                     pub
                     $c_field : Option<$c_type>,
-                )*
+                )+
             }
             }
 
@@ -421,6 +466,7 @@ macro_rules! create_binding {
                     }
                 )*
             }
+            )?
 
             $(
             ::doc_comment::doc_comment! {
@@ -649,7 +695,7 @@ macro_rules! create_binding {
         @search $search:tt
         @versioned ( $($versioned:tt)* )
         @not_versioned $not_versioned:tt
-            $current:tt [versioned $($($tags:tt)+)?]
+            $current:tt [versioned(true) $($($tags:tt)+)?]
             $($rest:tt)*
     ) => (
         create_binding! {
@@ -666,6 +712,35 @@ macro_rules! create_binding {
                 $($rest)*
         }
     );
+    // Not Versioned
+    (
+        @name $name:ident
+        @meta $meta:tt
+        @create_new $create_new:tt
+        @create $create:tt
+        @update_new $update_new:tt
+        @update $update:tt
+        @search $search:tt
+        @versioned $versioned:tt
+        @not_versioned ( $($not_versioned:tt)* )
+            $current:tt [versioned(false) $($($tags:tt)+)?]
+            $($rest:tt)*
+    ) => (
+        create_binding! {
+            @name $name
+            @meta $meta
+            @create_new $create_new
+            @create $create
+            @update_new $update_new
+            @update $update
+            @search $search
+            @versioned $versioned
+            @not_versioned ( $($not_versioned)* $current)
+                $($current [$($tags)+])?
+                $($rest)*
+        }
+    );
+
 
     // Nothing
     (
@@ -677,7 +752,7 @@ macro_rules! create_binding {
         @update $update:tt
         @search $search:tt
         @versioned $versioned:tt
-        @not_versioned ( $($not_versioned:tt)* )
+        @not_versioned $not_versioned:tt
             $current:tt []
             $($rest:tt)*
     ) => (
@@ -690,7 +765,7 @@ macro_rules! create_binding {
             @update $update
             @search $search
             @versioned $versioned
-            @not_versioned ( $($not_versioned)* $current )
+            @not_versioned $not_versioned
                 $($rest)*
         }
     );

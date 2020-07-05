@@ -13,6 +13,7 @@ create_calls! {
         Trashed: TrashedIdentifier,
         Criteria: FolderSearch 
     {
+        List;
         /// The list action lists all folders of the user except those in trash and the hidden ones.
         ///
         /// Notes
@@ -21,12 +22,14 @@ create_calls! {
         ///  - The list will not include suspended folders where a parent folder is in the trash
         pub async fn list(&self, details: Option<Details>) -> Result<Vec<Type>, Error>;
 
+        Get;
         /// The show action lists the properties of a single folder.
         ///
         /// Notes
         ///  - This is the only action that can access hidden folders
         pub async fn get(&self, details: Option<Details>, id: uuid::Uuid) -> Result<Type, Error>;
 
+        Find;
         /// The find action can be used to find all folders matching the given search criteria
         ///
         /// Notes
@@ -36,6 +39,7 @@ create_calls! {
         ///  - The list will not include suspended folders where a parent folder is in the trash
         pub async fn find(&self, criteria: Criteria, details: Option<Details>) -> Result<Vec<Type>, Error>;
 
+        Create;
         /// The create action creates a new folder with the given attributes.
         ///
         /// Notes
@@ -44,6 +48,7 @@ create_calls! {
         ///  - If the edited argument is "0", missing or in the future, the current time will be used
         pub async fn create(&self, value: Create) -> Result<Identifier, Error>;
 
+        Update;
         /// The update action creates a new revision of a folder with an updated set of attributes.
         ///
         /// Notes
@@ -55,6 +60,7 @@ create_calls! {
         ///  - If the edited time is in the future, the current time will be used
         pub async fn update(&self, value: Update) -> Result<Identifier, Error>;
 
+        Delete;
         /// The delete action moves a folder and its content to the trash or deletes it completely if it is already in the trash.
         ///
         /// Notes
@@ -65,6 +71,7 @@ create_calls! {
         ///  This way, a folder is not accidentally deleted instead of trashed if the client is out of sync.
         pub async fn delete(&self, id: uuid::Uuid, revision: Option<uuid::Uuid>) -> Result<Trashed, Error>;
 
+        Restore;
         /// The restore action can restore an earlier state of a folder.
         ///
         /// Notes
@@ -93,36 +100,57 @@ pub struct TrashedIdentifier {
 create_details! {
     pub struct Details {
         pub revisions: bool,
-        //pub parent: bool,
+        pub parent: bool,
         pub folders: bool,
         pub passwords: bool,
         pub tags: bool,
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum ParentInfoKind {
+    Id(uuid::Uuid),
+    Data(Box<crate::folder::Folder>),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(transparent)]
+pub struct ParentInfo(ParentInfoKind);
+
+impl ParentInfo {
+    pub fn get(&self) -> &ParentInfoKind {
+        &self.0
+    }
+    pub fn new(id: uuid::Uuid) -> Self {
+        Self(ParentInfoKind::Id(id))
+    }
+}
+
+
 create_binding! {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Folder {
-    pub id: uuid::Uuid [update(required)],
-    pub label: String [versioned create(required) update(required)],
-    pub parent: uuid::Uuid [versioned create(optional) update(optional) search],
-    pub created: u64 [search],
-    pub updated: u64 [versioned search],
-    pub edited: u64 [versioned update(optional)],
-    pub revision: uuid::Uuid [versioned],
+    pub id: uuid::Uuid [update(required) versioned(false)],
+    pub label: String [versioned(true) create(required) update(required)],
+    pub parent: ParentInfo [versioned(true) create(optional) update(optional) search],
+    pub created: u64 [search versioned(false)],
+    pub updated: u64 [versioned(true) search],
+    pub edited: u64 [versioned(true) update(optional)],
+    pub revision: uuid::Uuid [versioned(true)],
     #[serde(rename = "cseType")]
-    pub cse_type: String [versioned create(optional) update(optional) search],
+    pub cse_type: String [versioned(true) create(optional) update(optional) search],
     #[serde(rename = "cseKey")]
-    pub cse_key: String [versioned create(optional) update(optional)],
+    pub cse_key: String [versioned(true) create(optional) update(optional)],
     #[serde(rename = "sseType")]
-    pub sse_type: String [versioned search],
-    pub client: String [versioned],
-    pub hidden: bool [versioned create(optional) update(optional)],
-    pub trashed: bool [versioned search],
-    pub favorite: bool [versioned create(optional) update(optional) search],
+    pub sse_type: String [versioned(true) search],
+    pub client: String [versioned(true)],
+    pub hidden: bool [versioned(true) create(optional) update(optional)],
+    pub trashed: bool [versioned(true) search],
+    pub favorite: bool [versioned(true) create(optional) update(optional) search],
 
-    pub revisions: Option<Vec<VersionedFolder>> [],
-    pub folders: Option<Vec<Folder>> [],
-    pub passwords: Option<Vec<crate::password::Password>> [],
+    pub revisions: Option<Vec<VersionedFolder>> [versioned(false)],
+    pub folders: Option<Vec<Folder>> [versioned(false)],
+    pub passwords: Option<Vec<crate::password::Password>> [versioned(false)],
 }
 }
