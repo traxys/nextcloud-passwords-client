@@ -181,7 +181,7 @@ impl LoginDetails {
         }
         let client = reqwest::Client::new();
         let resp = client
-            .post(&format!("{}/login/v2/poll", server))
+            .post(&format!("{}index.php/login/v2", server))
             .send()
             .await?;
         if !resp.status().is_success() {
