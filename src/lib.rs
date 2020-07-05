@@ -223,8 +223,11 @@ impl AuthenticatedApi {
         data: D,
     ) -> Result<R, Error> {
         let r = self.reqwest(endpoint, method, data).await?;
-        let resp = r.json::<EndpointResponse<R>>().await?;
-        //dbg!(r.text().await?);
+        let text = r.text().await?;
+        let resp = serde_json::from_str(&text).map_err(|e| {
+            log::warn!("Response could not be read: {}", text);
+            e
+        })?;
         match resp {
             EndpointResponse::Success(r) => Ok(r),
             EndpointResponse::Error(e) => Err(Error::EndpointError(e)),
