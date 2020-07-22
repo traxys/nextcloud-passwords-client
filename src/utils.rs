@@ -505,6 +505,7 @@ macro_rules! create_binding {
                     $un_field: $un_type,
                 )*
                 $(
+                    #[serde(skip_serializing_if = "Option::is_none")]
                     $(#[$u_attr])*
                     pub
                     $u_field : Option<$u_type>,
