@@ -257,7 +257,7 @@ macro_rules! create_calls {
             $(#[$meta_update])*
             pub async fn update(&self, folder: $update) -> Result<$ident, $err> {
                 self.api
-                    .passwords_post(concat!($endpoint, "/update"), folder)
+                    .passwords_patch(concat!($endpoint, "/update"), folder)
                     .await
             }
             )?

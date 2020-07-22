@@ -1,6 +1,6 @@
 [package]
 name = "nextcloud-passwords-client"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Quentin Boyer <qbsecond@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -18,7 +18,6 @@ url = { version = "2.1.1", features = ["serde"] }
 reqwest = { version = "0.10.6", features = ["json"] }
 serde = { version = "1.0.114", features = ["derive"] }
 thiserror = "1.0.20"
-quick-xml = { version = "0.18.1", features = ["serialize"] }
 tokio = { version = "0.2.21", features = ["time", "rt-core"] }
 log = "0.4.8"
 uuid = { version = "0.8.1", features = ["serde"] }
