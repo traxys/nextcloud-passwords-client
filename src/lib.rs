@@ -219,7 +219,7 @@ impl LoginDetails {
 }
 
 /// The state needed to re-connect to a nextcloud instance
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ResumeState {
     server_url: Url,
     password_url: String,
